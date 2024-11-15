@@ -1,1 +1,1 @@
-forge create ./src/Declan.sol:Declan --rpc-url $BASE_SEPOLIA_RPC --private-key $PRIVATE_KEY --legacy
+
