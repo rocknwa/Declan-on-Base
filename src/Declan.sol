@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.26;
 
 /**
  * @title Declan Contract
  * @dev Developed by Therock Ani
  */
-import "./ReentrancyGuard.sol";
-contract Declan is ReentrancyGuard{
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
+contract Declan is ReentrancyGuard, Ownable {
     //
     // Events
     //
@@ -27,14 +28,20 @@ contract Declan is ReentrancyGuard{
     //
     // Enums
     //
-    
+
     // Enum for gig status
-    enum GigStatus { Open, BidPlaced, WIP, Completed, Reported, Confirmed }
+    enum GigStatus {
+        Open,
+        BidPlaced,
+        WIP,
+        Completed,
+        Reported,
+        Confirmed
+    }
 
     //
     // Structs
     //
-
     struct Freelancer {
         string name;
         address addr;
@@ -85,7 +92,6 @@ contract Declan is ReentrancyGuard{
     //
     // State
     //
-
     mapping(address => Freelancer) public freelancers;
     mapping(address => GigOwner) public gigOwners;
     mapping(uint256 => Gig) public gigs;
@@ -95,6 +101,10 @@ contract Declan is ReentrancyGuard{
     uint256 public noOfCreatedGigs;
     address public escrowerAccount;
 
+    uint256 public feePercentage = 2; // 2%
+    uint256 public collectedFees = 0;
+
+    // Add to the constructor
     constructor() {
         noOfFreelancers = 0;
         noOfGigOwners = 0;
@@ -105,20 +115,18 @@ contract Declan is ReentrancyGuard{
     //
     // Functions
     //
-
     modifier onlyGigOwner() {
-    require(bytes(gigOwners[msg.sender].gigOwner).length != 0, "Only gig owners can create gigs");
-    require(gigOwners[msg.sender].isVerified, "Gig owner must be verified");
-    _;
-}
+        require(bytes(gigOwners[msg.sender].gigOwner).length != 0, "Only gig owners can create gigs");
+        require(gigOwners[msg.sender].isVerified, "Gig owner must be verified");
+        _;
+    }
 
-modifier onlyVerifiedFreelancer() {
-    // Ensure the sender has a registered and verified freelancer account
-    require(bytes(freelancers[msg.sender].name).length != 0, "Freelancer account not found");
-    require(freelancers[msg.sender].verified, "Freelancer must be verified to perform this action");
-    _;
-}
-
+    modifier onlyVerifiedFreelancer() {
+        // Ensure the sender has a registered and verified freelancer account
+        require(bytes(freelancers[msg.sender].name).length != 0, "Freelancer account not found");
+        require(freelancers[msg.sender].verified, "Freelancer must be verified to perform this action");
+        _;
+    }
 
     // Function to create a freelancer account
     function createFreelancerAccount(
@@ -132,18 +140,8 @@ modifier onlyVerifiedFreelancer() {
         string memory country,
         uint32 jobCount
     ) public {
-        freelancers[msg.sender] = Freelancer(
-            name,
-            msg.sender,
-            portfolioURL,
-            skills,
-            categories,
-            verified,
-            stars,
-            email,
-            country,
-            jobCount
-        );
+        freelancers[msg.sender] =
+            Freelancer(name, msg.sender, portfolioURL, skills, categories, verified, stars, email, country, jobCount);
 
         emit FreelancerJoined(msg.sender);
     }
@@ -156,13 +154,7 @@ modifier onlyVerifiedFreelancer() {
         bool isVerified,
         uint32 stars
     ) public {
-        gigOwners[gigOwnerAddress] = GigOwner(
-            gigOwner,
-            gigOwnerAddress,
-            gigOwnerCompany,
-            isVerified,
-            stars
-        );
+        gigOwners[gigOwnerAddress] = GigOwner(gigOwner, gigOwnerAddress, gigOwnerCompany, isVerified, stars);
     }
 
     // Function to create a new gig
@@ -172,7 +164,7 @@ modifier onlyVerifiedFreelancer() {
         string memory description,
         uint256 gigTimeline,
         uint256 budget
-    ) public onlyGigOwner returns (uint256){
+    ) public onlyGigOwner returns (uint256) {
         uint256 newGigId = getCurrentGigId();
 
         Gig storage gig = gigs[newGigId];
@@ -183,7 +175,7 @@ modifier onlyVerifiedFreelancer() {
         gig.title = title;
         gig.description = description;
         gig.gigTimeline = gigTimeline;
-        gig.deadline = block.timestamp + gigTimeline;  // Set initial deadline based on timeline
+        gig.deadline = block.timestamp + gigTimeline; // Set initial deadline based on timeline
         gig.budget = budget;
         gig.featureGig = false;
         gig.status = GigStatus.Open;
@@ -212,23 +204,22 @@ modifier onlyVerifiedFreelancer() {
         require(bytes(freelancer.name).length != 0, "Freelancer not found");
 
         // Store the bid information
-        gig.bids.push(Bid({
-            bidder: bidderAddress,
-            freelancerName: freelancer.name,
-            freelancerSkills: freelancer.skills,
-            freelancerPortfolioURL: freelancer.portfolioURL,
-            bidAmount: bidAmount
-        }));
+        gig.bids.push(
+            Bid({
+                bidder: bidderAddress,
+                freelancerName: freelancer.name,
+                freelancerSkills: freelancer.skills,
+                freelancerPortfolioURL: freelancer.portfolioURL,
+                bidAmount: bidAmount
+            })
+        );
         gig.status = GigStatus.BidPlaced;
 
         emit BidPlaced(gigId, bidderAddress);
     }
 
     // Function to accept a freelancer bid
-    function acceptBid(
-        uint256 gigId,
-        uint256 bidIndex
-    ) public payable onlyGigOwner{
+    function acceptBid(uint256 gigId, uint256 bidIndex) public payable onlyGigOwner {
         Gig storage gig = gigs[gigId];
 
         // Perform validation checks
@@ -236,7 +227,7 @@ modifier onlyVerifiedFreelancer() {
 
         // Retrieve the bid
         Bid storage acceptedBid = gig.bids[bidIndex];
-        
+
         gig.freelancer = acceptedBid.bidder;
         gig.deadline += gig.gigTimeline;
         gig.escrowAmount = acceptedBid.bidAmount;
@@ -246,12 +237,12 @@ modifier onlyVerifiedFreelancer() {
         // Transfer the bid amount to the escrow account
         // Assuming the contract can hold Ether (hence using payable)
         require(msg.value == gig.budget, "Insufficient escrow amount");
-        
+
         emit AcceptBid(gigId, acceptedBid.bidder);
     }
 
     // Function to confirm gig completion
-    function completeGig(uint256 gigId) public onlyVerifiedFreelancer{
+    function completeGig(uint256 gigId) public onlyVerifiedFreelancer {
         Gig storage gig = gigs[gigId];
 
         // Perform validation checks and confirm completion
@@ -261,7 +252,7 @@ modifier onlyVerifiedFreelancer() {
         gig.status = GigStatus.Completed;
     }
 
-    function confirmGig(uint256 gigId) public onlyGigOwner nonReentrant{
+    function confirmGig(uint256 gigId) public onlyGigOwner nonReentrant {
         Gig storage gig = gigs[gigId];
         require(gig.status == GigStatus.Completed, "Gig is not completed");
 
@@ -269,7 +260,11 @@ modifier onlyVerifiedFreelancer() {
 
         // Transfer funds from escrow to freelancer account
         //payable(gig.freelancer).transfer(gig.escrowAmount);
-        (bool success, ) = payable(gig.freelancer).call{value: gig.escrowAmount}("");
+        uint256 fee = (gig.escrowAmount * feePercentage) / 100;
+        uint256 payout = gig.escrowAmount - fee;
+        collectedFees += fee;
+
+        (bool success,) = payable(gig.freelancer).call{value: payout}("");
         require(success, "Transfer failed");
     }
 
@@ -282,19 +277,26 @@ modifier onlyVerifiedFreelancer() {
         gig.warningCount += 1;
     }
 
-    function reportGig(uint256 gigId) public nonReentrant{
+    function reportGig(uint256 gigId) public nonReentrant {
         Gig storage gig = gigs[gigId];
+        
+         // Transfer funds from escrow to freelancer account
+        //payable(gig.freelancer).transfer(gig.escrowAmount);
+        uint256 fee = (gig.escrowAmount * feePercentage) / 100;
+        uint256 payout = gig.escrowAmount - fee;
+        collectedFees += fee;
+
         if (gig.status == GigStatus.WIP && gig.warningCount == 3) {
             // Transfer funds from escrow to gig owner account
-           // payable(gig.owner).transfer(gig.escrowAmount);
-            (bool success, ) = payable(gig.owner).call{value: gig.escrowAmount}("");
-        require(success, "Transfer failed");
+            // payable(gig.owner).transfer(gig.escrowAmount);
+            (bool success,) = payable(gig.owner).call{value: gig.escrowAmount}("");
+            require(success, "Transfer failed");
         }
         if (gig.status == GigStatus.Completed && gig.warningCount == 3) {
             // Transfer funds from escrow to freelancer account
-           // payable(gig.freelancer).transfer(gig.escrowAmount);
-            (bool success, ) = payable(gig.freelancer).call{value: gig.escrowAmount}("");
-        require(success, "Transfer  failed");
+            // payable(gig.freelancer).transfer(gig.escrowAmount);
+            (bool success,) = payable(gig.freelancer).call{value: payout}("");
+            require(success, "Transfer  failed");
         }
 
         gig.status = GigStatus.Reported;
@@ -325,5 +327,15 @@ modifier onlyVerifiedFreelancer() {
     // Internal helper function to generate a unique gig ID
     function getCurrentGigId() internal view returns (uint256) {
         return noOfCreatedGigs;
+    }
+
+    function withdrawFees() public onlyOwner {
+        require(collectedFees > 0, "No fees to withdraw");
+
+        uint256 amount = collectedFees;
+        collectedFees = 0;
+
+        (bool success,) = payable(owner()).call{value: amount}("");
+            require(success, "Transfer  failed");
     }
 }

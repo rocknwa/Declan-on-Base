@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.26;
 
 import {Script, console} from "forge-std/Script.sol";
 import {Declan} from "../src/Declan.sol"; // Update the import path as necessary
@@ -9,7 +9,7 @@ contract DeclanScript is Script {
 
     function run() public {
         vm.startBroadcast();
-        
+
         // Deploy the TransportDApp contract
         Declan declan = new Declan();
 

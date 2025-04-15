@@ -4,9 +4,16 @@ out = "out"
 libs = ["lib"]
 
 # Add compiler version
-solc_version = "0.8.20"
+solc_version = "0.8.26"
 
 # Enable cache path
 cache_path = "out"
+# Enable optimizer
+optimizer = true
+# Enable optimizer runs
+
+
+viaIR = true
+
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
