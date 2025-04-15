@@ -95,8 +95,8 @@ To get started with this project, please ensure you have the following installed
 Clone the repository:
 
 ```bash
-git clone https://github.com/rocknwa/declan.git
-cd declan
+git clone https://github.com/rocknwa/On-chain-freelancing-Dapp.git
+cd On-chain-freelancing-Dapp
 ```
 
 Install any required node dependencies if your workflow uses additional JavaScript tools:
